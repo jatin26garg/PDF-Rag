@@ -15,23 +15,23 @@ from app.utils.file_handlers import extract_text_from_file
 
 class RAGService:
     
-    def __intit__(self):
+    def __init__(self):
 
-        self.collection = chromadb.PersistentClient(
+        self.chroma_client = chromadb.PersistentClient(
             path =settings.CHROMA_PERSIST_DIR
         )
 
-        self.collection = self.collection.get_or_create_collection(
+        self.collection = self.chroma_client.get_or_create_collection(
              name = settings.CHROMA_COLLECTION_NAME,
              metadata={"hnsw:space": "cosine"}
         )
 
-        self.embedidings = GoogleGenerativeAIEmbeddings(
+        self.embeddings = GoogleGenerativeAIEmbeddings(
             model = "models/embeddings-001",
             google_api_key = settings.GEMINI_API_KEY
         )
         self.llm = ChatGoogleGenerativeAI(
-            model= "gemmini-1.5-flash",
+            model= "gemini-1.5-flash",
             google_api_key = settings.GEMINI_API_KEY,
             temperature = 0.3,
         )
