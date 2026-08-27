@@ -187,5 +187,23 @@ class RAGService:
             "answer" : answer,
             "sources" : source_info,
         }
+    
+    def get_documents(self)->List[Dict[str,Any]]:
+        return list(self._documents.values())
+    
+    def delete_document(self,doc_id :str)->bool:
+        results =self.collection.get(
+            where={"document_id" : doc_id}
+        )
+        if results and results['ids']:
+            self.collection.delete(ids= results['ids'])
+        if doc_id in self._documents:
+            del self._documents[doc_id]
+            return True
+        return False
+        
+        
+        
+        
         
         
