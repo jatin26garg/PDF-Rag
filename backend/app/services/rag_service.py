@@ -165,3 +165,27 @@ class RAGService:
                 "content_preview"  :chunk['content'][:200] + "...",
             })
         context = "\n\n".join(context_parts)
+        
+        print(f" generating answer --")
+        
+        chain = (
+            {
+                "context"  : lambda x:x["context"],
+                "question" : lambda x:x["question"],
+            }
+            | self.prompt
+            | self.llm
+            | StrOutputParser()
+        )
+        
+        answer = chain.invoke({
+            "context" : context,
+            "question" :question,
+        })
+        
+        return {
+            "answer" : answer,
+            "sources" : source_info,
+        }
+        
+        
