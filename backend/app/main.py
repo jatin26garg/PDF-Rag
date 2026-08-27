@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 
 from app.config import settings
-from app.models import QueryRequest
+from app.models import QueryRequest,QueryResponse,Documentinfo
 from app.services import rag_service
 
 rag = rag_service
@@ -64,4 +64,35 @@ async def upload_document(file: UploadFile = File(...)):
     except Exception as e:
         print(f"upload error : {str(e)}")
         raise HTTPException(400, detail=str(e))
-        
+    
+@app.post("/query",response_model=QueryResponse)
+async def ask_question(request: QueryRequest):
+    
+    try:
+        if not request.question or len(request.question.strip()) == 0:
+            raise HTTPException(400,"Question is empty")
+        result = rag.query(question =request.question, top_k = request.top_k)
+        return result
+    
+    except Exception as e:
+        print(f" Query Error : {str(e)}")
+        raise HTTPException(500, detail=f"internal error {str(e)}")
+    
+@app.get("/documents", response_model=List[Documentinfo])
+async def list_documents():
+    return rag.get_documents
+
+@app.delete("/documents/{doc_id}")
+async def delete_document(doc_id:str):
+    try:
+        success = rag.delete_document(doc_id)
+        if not success:
+            raise HTTPException(404, f" document {doc_id} not found")
+        return {
+            "status" : "success",
+            "message" : f" document {doc_id} deleted successfully!"
+        }
+    except Exception as e:
+        print(f" couldnt delete")
+        raise HTTPException(500, detail=f" internal error : {str(e)}")
+    
