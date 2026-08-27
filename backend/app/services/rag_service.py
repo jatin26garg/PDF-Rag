@@ -27,11 +27,11 @@ class RAGService:
         )
 
         self.embeddings = GoogleGenerativeAIEmbeddings(
-            model = "models/embeddings-001",
+            model = "models/gemini-embedding-001",
             google_api_key = settings.GEMINI_API_KEY
         )
         self.llm = ChatGoogleGenerativeAI(
-            model= "gemini-1.5-flash",
+            model= "gemini-2.5-flash",
             google_api_key = settings.GEMINI_API_KEY,
             temperature = 0.3,
         )
@@ -73,7 +73,7 @@ class RAGService:
         chunks_with_metadata = chunk_document(
             text=text,
             metadata={
-                "filename":file_name,
+                "file_name":file_name,
                 "uploadedAt" : datetime.now().isoformat(),
             },
             chunk_size= 500,
@@ -100,18 +100,27 @@ class RAGService:
             })
         
         print(f" generate embidings")
-        embedidings = self.embedidings.embed_documents(documents)
-        print(f" generated {len(embedidings)} embidings")
+      
+
+        print("DOCUMENTS:", documents)
+        print("DOCUMENT TYPE:", type(documents))
+
+        for doc in documents:
+            print("EACH DOC TYPE:", type(doc))
+
+        embeddings = self.embeddings.embed_documents(documents)
+        print(f" generated {len(embeddings)} embidings")
+        
         
         self.collection.add(
             ids = ids,
             documents=documents,
-            embeddings=embedidings,
+            embeddings=embeddings,
             metadatas=metadatas
         )
         self._documents[doc_id] = {
             "id": doc_id,
-            "filename": file_name,
+            "file_name": file_name,
             "chunk_count": len(chunks_with_metadata),
             "uploaded_at": datetime.now().isoformat(),
         }
@@ -128,7 +137,7 @@ class RAGService:
             },
         
         print(f" processing the document")
-        query_embedding = self.embedidings.embed_query(question)
+        query_embedding = self.embeddings.embed_query(question)
         
         results = self.collection.query(
             query_embeddings=[query_embedding],

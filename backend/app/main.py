@@ -4,9 +4,9 @@ from typing import List
 
 from app.config import settings
 from app.models import QueryRequest,QueryResponse,Documentinfo
-from app.services import rag_service
+from app.services.rag_service import RAGService
 
-rag = rag_service
+rag = RAGService()
 
 app = FastAPI(
     title="Document RAG API",
@@ -72,6 +72,7 @@ async def ask_question(request: QueryRequest):
         if not request.question or len(request.question.strip()) == 0:
             raise HTTPException(400,"Question is empty")
         result = rag.query(question =request.question, top_k = request.top_k)
+        print(f"the result is {result}")
         return result
     
     except Exception as e:

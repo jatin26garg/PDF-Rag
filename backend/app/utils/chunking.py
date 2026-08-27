@@ -36,7 +36,7 @@ def chunk_document(text:str, metadata:Dict[str, Any],chunk_size:int =500,chunk_o
 
     return[
         {
-            "content" : chunks,
+            "content" : chunk,
             "metadata" : {
                 **metadata,
                 "chunk_index" : i,
