@@ -15,11 +15,14 @@ from app.config import settings
 from app.utils.chunking import chunk_document
 from app.utils.file_handlers import extract_text_from_file
 
+from FlagEmbedding import BGEM3FlagModel
+
 
 class RAGService:
     
     def __init__(self):
 
+        
         self.client = QdrantClient(
                             host= settings.QDRANT_HOST,
                             port= settings.QDRANT_PORT,
@@ -29,9 +32,10 @@ class RAGService:
         self.collection_name = settings.QDRANT_COLLECTION_NAME
         
 
-        self.embeddings = GoogleGenerativeAIEmbeddings(
-            model = "models/gemini-embedding-001",
-            google_api_key = settings.GEMINI_API_KEY
+        self.embeddings = BGEM3FlagModel(
+            settings.EMBEDDING_MODEL,
+            use_fp16=False,
+            device="cpu"
         )
         
         self.llm = ChatGoogleGenerativeAI(
@@ -79,7 +83,27 @@ class RAGService:
                 ),
             )
             print(f"collection {self.collection_name} created !")
-            
+    
+    def _get_embeddings(self, texts:List[str])->List[List[float]]:
+        
+        output = self.embeddings.encode(
+            texts,
+            return_dense=True,
+            return_sparse=True,
+            return_colbert_vecs=False,
+        )
+        
+        dense_embeddings = output['dense_vecs']
+        return dense_embeddings
+    def _get_query_embeddings(self, query:str)->List[float]:
+        
+        output = self.embeddings.encode(
+            query,
+            return_dense=True,
+            return_sparse=False,
+            return_colbert_vecs=False,
+        )
+        return output['dense_vecs']
         
     def process_document(self, file_content : bytes , file_name:str)->str:
         
@@ -109,11 +133,11 @@ class RAGService:
         
         doc_id = str(uuid.uuid4())
         
-        print(f" generating embeddings")
+        print(f" generating embeddings with BGE-M3")
         
         chunks_text = [chunk["content"] for chunk in chunks_with_metadata]
         
-        dense_embeddings = self.embeddings.embed_documents(chunks_text)
+        dense_embeddings = self._get_embeddings(chunks_text)
         
         print(f" generated {len(dense_embeddings)} embeddings")
         
@@ -162,7 +186,7 @@ class RAGService:
             },
         
         print(f" processing the document")
-        query_embedding = self.embeddings.embed_query(question)
+        query_embedding = self._get_query_embeddings(question)
         
         results = self.client.query_points(
             collection_name=self.collection_name,

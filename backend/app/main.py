@@ -26,6 +26,9 @@ app.add_middleware(
 async def root():
     return{
         "status" : "healthy",
+        "embedding_model": "BAAI/bge-m3",
+        "vector_db": "Qdrant",
+        "embedding_dimension": 1024,
         "service" : "Document RAG API",
         "version" : "1.0.0"
     }
