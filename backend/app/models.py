@@ -10,7 +10,7 @@ class QueryRequest(BaseModel):
 class SourceInfo(BaseModel):
     source_index:int
     file_name:str
-    similarity: float
+    score: float
     content_preview : str
     
 class QueryResponse(BaseModel):

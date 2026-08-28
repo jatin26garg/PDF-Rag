@@ -8,6 +8,9 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings,ChatGoogleGenera
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
+from qdrant_client import QdrantClient,models
+from qdrant_client.http.exceptions import UnexpectedResponse
+
 from app.config import settings
 from app.utils.chunking import chunk_document
 from app.utils.file_handlers import extract_text_from_file
@@ -17,24 +20,26 @@ class RAGService:
     
     def __init__(self):
 
-        self.chroma_client = chromadb.PersistentClient(
-            path =settings.CHROMA_PERSIST_DIR
-        )
-
-        self.collection = self.chroma_client.get_or_create_collection(
-             name = settings.CHROMA_COLLECTION_NAME,
-             metadata={"hnsw:space": "cosine"}
-        )
+        self.client = QdrantClient(
+                            host= settings.QDRANT_HOST,
+                            port= settings.QDRANT_PORT,
+                            timeout=60.0,
+                            )
+        
+        self.collection_name = settings.QDRANT_COLLECTION_NAME
+        
 
         self.embeddings = GoogleGenerativeAIEmbeddings(
             model = "models/gemini-embedding-001",
             google_api_key = settings.GEMINI_API_KEY
         )
+        
         self.llm = ChatGoogleGenerativeAI(
             model= "gemini-2.5-flash",
             google_api_key = settings.GEMINI_API_KEY,
             temperature = 0.3,
         )
+        
         self.prompt = ChatPromptTemplate.from_template("""
             You are a helpful assistant that answers questions based on the provided context.
 
@@ -55,6 +60,26 @@ class RAGService:
             ANSWER: 
             """)
         self._documents = {}
+        self._ensure_collection_exists()
+
+    def _ensure_collection_exists(self):
+        collections = self.client.get_collections().collections
+        
+        collection_names = [c.name for c in collections]
+        
+        if self.collection_name not in collection_names:
+            
+            print(f" creating collectiion: {self.collection_name}")
+            
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=models.VectorParams(
+                    size=settings.DENSE_VECTOR_SIZE,
+                    distance=models.Distance.COSINE
+                ),
+            )
+            print(f"collection {self.collection_name} created !")
+            
         
     def process_document(self, file_content : bytes , file_name:str)->str:
         
@@ -84,49 +109,49 @@ class RAGService:
         
         doc_id = str(uuid.uuid4())
         
-        ids = []
-        documents = []
-        metadatas  = []
+        print(f" generating embeddings")
+        
+        chunks_text = [chunk["content"] for chunk in chunks_with_metadata]
+        
+        dense_embeddings = self.embeddings.embed_documents(chunks_text)
+        
+        print(f" generated {len(dense_embeddings)} embeddings")
+        
+        points = []
         
         for i,chunk_data in enumerate(chunks_with_metadata):
-            chunk_id = f"{doc_id}_chunk_{i}"
-            ids.append(chunk_id)
-            documents.append(chunk_data["content"])
-            metadatas.append({
-                **chunk_data["metadata"],
-                "document_id" : doc_id,
-                "chunk_index" : i,
-                "total_chunks":len(chunks_with_metadata),
-            })
+            chunk_id = str(uuid.uuid4())
+            
+            point = models.PointStruct(
+                id = chunk_id,
+                vector=  dense_embeddings[i],
+                payload={
+                    "content" : chunk_data["content"],
+                    "file_name": file_name,
+                    "document_id":doc_id,
+                    "chunk_index": i,
+                    "total_chunks":len(chunks_with_metadata),
+                    "uploaded_at":datetime.now().isoformat(),
+                }
+            )
+            points.append(point)
         
-        print(f" generate embidings")
-      
-
-        print("DOCUMENTS:", documents)
-        print("DOCUMENT TYPE:", type(documents))
-
-        for doc in documents:
-            print("EACH DOC TYPE:", type(doc))
-
-        embeddings = self.embeddings.embed_documents(documents)
-        print(f" generated {len(embeddings)} embidings")
-        
-        
-        self.collection.add(
-            ids = ids,
-            documents=documents,
-            embeddings=embeddings,
-            metadatas=metadatas
+        print(f" uploading {len(points)} points to Qdrant")
+        self.client.upsert(
+            collection_name=self.collection_name,
+            points=points,
         )
-        self._documents[doc_id] = {
-            "id": doc_id,
+        print(f" uploaded complete")
+        
+        self._documents[doc_id]={
+            "id" : doc_id,
             "file_name": file_name,
             "chunk_count": len(chunks_with_metadata),
             "uploaded_at": datetime.now().isoformat(),
         }
-        print(f"  Document processed successfully: {file_name} (ID: {doc_id})")
         
         return doc_id
+        
 
     def query(self, question:str, top_k: int = 3)->Dict[str,Any]:
         
@@ -139,39 +164,42 @@ class RAGService:
         print(f" processing the document")
         query_embedding = self.embeddings.embed_query(question)
         
-        results = self.collection.query(
-            query_embeddings=[query_embedding],
-            n_results=top_k,
-            include=["documents", "metadatas","distances"]
+        results = self.client.query_points(
+            collection_name=self.collection_name,
+            query=query_embedding,
+            limit=top_k,
+            with_payload=True,
+            with_vectors=False,
         ) 
-        chunks = []
         
-        if results and results['documents']:
-            for i in range (len(results['documents'][0])):
-                similarity = 1 - (results['distances'][0][i]  / 2)
-                chunks.append({
-                    "content": results['documents'][0][i],
-                    "metadata" : results['metadatas'][0][i],
-                    "similarity" : similarity,
-                })
-        if not chunks:
-            return{
-                "answer" : (
-                    "couldnt find relevant info about the query .  could you please elaborate your query"
-                ),
-                "sources" : []
+        
+        if not results.points:
+            return {
+                "answer": "I couldn't find any relevant information in your documents.",
+                "sources": [],
             }
-            
+        
+        
+             
         context_parts  = []
         source_info  = []
         
-        for i,chunk in enumerate(chunks,1):
-            context_parts.append(f"[Source{i}] {chunk['content']}")
+        for i,point in enumerate(results.points,1):
+            
+            playload = point.payload or {}
+            
+            content = playload.get("content","")
+            
+            content = " ".join(content.split())
+            
+            context_parts.append(f"[Source{i}] {content}")
+            
             source_info.append({
                 "source_index" : i,
-                "file_name" : chunk['metadata'].get('file_name', 'Unknown'),
-                "similarity"  :round(chunk['similarity'], 3),
-                "content_preview"  :chunk['content'][:200] + "...",
+                "file_name" : playload.get("file_name","Unknown"),
+                "score"  :round(point.score,4),
+                "chunk_id":point.id, 
+                "content_preview"  :content[:200] + "..." if len(content) > 200 else content,
             })
         context = "\n\n".join(context_parts)
         
@@ -201,15 +229,50 @@ class RAGService:
         return list(self._documents.values())
     
     def delete_document(self,doc_id :str)->bool:
-        results =self.collection.get(
-            where={"document_id" : doc_id}
+        points_to_delete =[]
+        scroll_limit = 100
+        
+        while True:
+            scroll_result = self.client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="document_id",
+                            match=models.MatchValue(value=doc_id),
+                        )
+                    ]
+                ),
+                limit=scroll_limit,
+                with_payload=False,
+                with_vectors=False,
+            )
+            points= scroll_result[0]
+            if not points:
+                break
+            points_to_delete.extend([p.id for p in points])
+            
+            if len(points) < scroll_limit:
+                break
+        
+        if not points_to_delete:
+            if doc_id in self._documents:
+                del self._documents[doc_id]
+            return False
+        
+        self.client.delete(
+            collection_name=self.collection_name,
+            points_selector=models.PointIdsList(points=points_to_delete),
         )
-        if results and results['ids']:
-            self.collection.delete(ids= results['ids'])
+        
         if doc_id in self._documents:
             del self._documents[doc_id]
-            return True
-        return False
+        
+        print(f" document deleted finally")
+        
+        return True
+    
+            
         
         
         
