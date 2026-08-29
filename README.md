@@ -274,41 +274,18 @@ rag-project/
 │   │   ├── services/
 │   │   │   ├── __init__.py
 │   │   │   ├── rag_service.py   # Core RAG logic (search, generation)
-│   │   │   ├── embedding_service.py  # BGE-M3 embeddings
-│   │   │   ├── qdrant_service.py     # Qdrant operations
-│   │   │   └── llm_service.py   # Gemini API interactions
+│   │   │   └── embedding_service.py  # BGE-M3 embeddings
 │   │   ├── utils/
 │   │   │   ├── __init__.py
 │   │   │   ├── file_handlers.py # PDF/DOCX/TXT extraction
-│   │   │   ├── chunking.py      # Text chunking with overlap
-│   │   │   └── validators.py    # Input validation
+│   │   │   └── chunking.py      # Text chunking with overlap
 │   │   └── routes/
-│   │       ├── __init__.py
-│   │       ├── documents.py     # Upload, list, delete endpoints
-│   │       └── query.py         # Search & Q&A endpoints
+│   │       └── __init__.py
 │   ├── requirements.txt         # Python dependencies
 │   ├── .env.example             # Environment variables template
 │   ├── .env                     # Actual env variables (git ignored)
-│   ├── run.py                   # Startup script
-│   └── docker-compose.yml       # Qdrant + Backend stack
-├── frontend/
-│   ├── app/
-│   │   ├── page.tsx             # Main search interface
-│   │   ├── layout.tsx           # Root layout
-│   │   ├── components/
-│   │   │   ├── SearchBar.tsx
-│   │   │   ├── DocumentUpload.tsx
-│   │   │   ├── AnswerDisplay.tsx
-│   │   │   └── CitationCard.tsx
-│   │   └── styles/
-│   ├── package.json
-│   └── tailwind.config.js
-├── docker-compose.yml           # Full stack (backend + Qdrant + frontend)
-├── README.md                    # This file
-└── docs/
-    ├── INSTALLATION.md          # Detailed setup instructions
-    ├── API_REFERENCE.md         # API endpoint documentation
-    └── ARCHITECTURE.md          # Deep dive into components
+│   
+└──  README.md                    # This file
 ```
 
 ---
