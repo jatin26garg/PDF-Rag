@@ -385,14 +385,6 @@ curl -X POST "http://localhost:8000/query" \
   }'
 ```
 
-### Step 6: (Optional) Run Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-# Frontend at http://localhost:3000
-```
-
 ### Try the Live Demo
 Visit [https://advanced-rag-demo.example.com](https://advanced-rag-demo.example.com) to upload documents and test the system without local setup.
 
