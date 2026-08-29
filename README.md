@@ -345,6 +345,11 @@ cp .env.example .env
 # QDRANT_URL=http://localhost:6333
 # CHUNK_SIZE=500
 # CHUNK_OVERLAP=100
+# EMBEDDING_MODEL=BAAI/bge-m3
+# ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8000
+# QDRANT_HOST=localhost
+#QDRANT_PORT=6333
+# QDRANT_COLLECTION_NAME=my_documents
 ```
 
 ### Step 3: Start Qdrant Database
