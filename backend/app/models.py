@@ -10,8 +10,9 @@ class QueryRequest(BaseModel):
 class SourceInfo(BaseModel):
     source_index:int
     file_name:str
-    score: float
+    rrf_score: float
     content_preview : str
+    chunk_id:str
     
 class QueryResponse(BaseModel):
     answer : str

@@ -1,6 +1,6 @@
 import os
 import uuid
-from typing import List, Dict,Any
+from typing import List, Dict,Any , Tuple
 from datetime import datetime
 import chromadb
 from chromadb.config import Settings as ChromaSettings
@@ -73,18 +73,30 @@ class RAGService:
         
         if self.collection_name not in collection_names:
             
-            print(f" creating collectiion: {self.collection_name}")
+            print(f" creating Hybrid collectiion: {self.collection_name}")
             
             self.client.create_collection(
                 collection_name=self.collection_name,
-                vectors_config=models.VectorParams(
-                    size=settings.DENSE_VECTOR_SIZE,
-                    distance=models.Distance.COSINE
-                ),
+                
+                vectors_config={
+                    "dense" : models.VectorParams(
+                            size=settings.DENSE_VECTOR_SIZE,
+                            distance=models.Distance.COSINE
+                    ),
+                },
+                sparse_vectors_config ={
+                    "sparse": models.SparseVectorParams(
+                        index = models.SparseIndexParams(
+                            on_disk=False,
+                        ),
+                        modifier=models.Modifier.IDF,
+                    )
+                }
+                
             )
-            print(f"collection {self.collection_name} created !")
+            print(f"Hybrid collection {self.collection_name} created !")
     
-    def _get_embeddings(self, texts:List[str])->List[List[float]]:
+    def _get_embeddings(self, texts:List[str])-> Tuple[List[List[float]] , List[Dict]]:
         
         output = self.embeddings.encode(
             texts,
@@ -94,16 +106,161 @@ class RAGService:
         )
         
         dense_embeddings = output['dense_vecs']
-        return dense_embeddings
-    def _get_query_embeddings(self, query:str)->List[float]:
+        sparse_embeddings = []
+        for sparse_vec  in  output['lexical_weights']:
+            indices = list(sparse_vec.keys())
+            values  = list(sparse_vec.values())
+            sparse_embeddings.append({
+                "indices" : indices,
+                "values" : values,
+            })
+            
+            
+        return dense_embeddings,sparse_embeddings
+    
+    def _get_query_embeddings(self, query:str)->Tuple[List[float], Dict]:
         
         output = self.embeddings.encode(
             query,
             return_dense=True,
-            return_sparse=False,
+            return_sparse=True,
             return_colbert_vecs=False,
         )
-        return output['dense_vecs']
+        sparse_query = output['lexical_weights']
+        
+        dense_query= output['dense_vecs']
+        
+        sparse_query_formated={
+            "indices": list(sparse_query.keys()),
+            "values": list(sparse_query.values()),
+        }
+        return dense_query, sparse_query_formated
+        
+    def _reciprocal_rank_fusion(self,
+                                dense_results:List[models.ScoredPoint],
+                                sparse_results:List[models.ScoredPoint], 
+                                k:int =60,
+                                dense_weight:float= 0.5,
+                                sparse_weight:float = 0.5,
+                                )->List[Tuple[str,Any]]:
+        
+        dense_dict = {point.id: point for point in dense_results}
+        sparse_dict = {point.id: point for point in sparse_results}
+        
+        
+        all_ids = set(dense_dict.keys()) | set(sparse_dict.keys())
+        
+        combined_results = []
+        
+        for chunk_id in all_ids:
+            rrf_score = 0
+            dense_rank = None
+            sparse_rank = None
+            
+            if chunk_id in dense_dict:
+                for i,point in enumerate(dense_results,1):
+                    if point.id == chunk_id:
+                        dense_rank = i
+                        break
+                rrf_score += dense_weight*(1/(k+dense_rank))
+            
+            if chunk_id in sparse_dict:
+                for i,point in enumerate(sparse_results,1):
+                    if point.id == chunk_id:
+                        sparse_rank = i
+                        break
+                rrf_score += sparse_weight*(1/(k+sparse_rank))
+            
+            if chunk_id in dense_dict:
+                payload = dense_dict[chunk_id].payload
+            else:
+                payload = sparse_dict[chunk_id].payload
+        
+            combined_results.append({
+                "id" : chunk_id,
+                "rrf_score": rrf_score,
+                "dense_rank":dense_rank,
+                "sparse_rank": sparse_rank,
+                "payload" :payload,
+            })
+        
+        combined_results.sort(key = lambda x:x["rrf_score"] , reverse=True)
+        
+        return combined_results
+    
+    def hybrid_search(self,
+                      query: str,
+                      top_k:int = 3,
+                      dense_limit:int = 10,
+                      sparse_limit:int = 10,
+                      dense_weight:float = 0.5,
+                      sparse_weight:float = 0.5,
+                      )->List[Dict[str,Any]]:
+        
+        print(f" performing dense Search on {query}")
+        
+        dense_query, sparse_query = self._get_query_embeddings(query)
+        
+        print(f" running dense or Semantic Search")
+        
+        dense_search = self.client.query_points(
+            collection_name=self.collection_name,
+            query=dense_query,
+            using="dense",
+            limit=dense_limit,
+            with_payload=True,
+            with_vectors=False,
+        )
+        #  print(f"   Found {len(dense_search)} dense results")
+        
+        dense_results = dense_search.points
+        
+        print(f" Running sparse Search or keyword search")
+        
+        sparse_search = self.client.query_points(
+            collection_name=self.collection_name,
+            query=(
+                models.SparseVector(
+                    indices=sparse_query["indices"],
+                    values=sparse_query["values"],
+                )
+            ),
+            using="sparse",
+            limit=sparse_limit,
+            with_payload=True,
+            with_vectors=False,
+        )
+        sparse_results = sparse_search.points
+        # print(f"   Found {len(sparse_search)} sparse results")
+        print(f"   Combining results with RRF...")
+        
+        fused_results = self._reciprocal_rank_fusion(
+            dense_results=dense_results,
+            sparse_results=sparse_results,
+            k=60,
+            dense_weight=dense_weight,
+            sparse_weight=sparse_weight
+        )
+        
+        final_results = []
+        
+        for result in fused_results[:top_k]:
+            payload = result["payload"]
+            
+            final_results.append({
+                "id":result["id"],
+                "content":payload.get("content",""),
+                "file_name":payload.get("file_name","Unknown"),
+                "document_id":payload.get("document_id",""),
+                "chunk_index": payload.get("chunk_index", 0),
+                "rrf_score": round(result["rrf_score"], 4),
+                "dense_rank": result["dense_rank"],
+                "sparse_rank": result["sparse_rank"],
+            })
+        print(f" Hybrid search returned {len(final_results)} results")
+        
+        return final_results
+ 
         
     def process_document(self, file_content : bytes , file_name:str)->str:
         
@@ -137,9 +294,10 @@ class RAGService:
         
         chunks_text = [chunk["content"] for chunk in chunks_with_metadata]
         
-        dense_embeddings = self._get_embeddings(chunks_text)
+        dense_embeddings, sparse_embeddings = self._get_embeddings(chunks_text)
         
-        print(f" generated {len(dense_embeddings)} embeddings")
+        print(f" generated {len(dense_embeddings)} embeddings , sparse embedings")
+        
         
         points = []
         
@@ -148,7 +306,13 @@ class RAGService:
             
             point = models.PointStruct(
                 id = chunk_id,
-                vector=  dense_embeddings[i],
+                vector=  {
+                    "dense":dense_embeddings[i],
+                    "sparse":models.SparseVector(
+                        indices=sparse_embeddings[i]["indices"],
+                        values=sparse_embeddings[i]["values"],
+                    )
+                },
                 payload={
                     "content" : chunk_data["content"],
                     "file_name": file_name,
@@ -184,35 +348,25 @@ class RAGService:
                 "answer"  : ("no documents have been been uploaded .. please upload the document first"),
                 "sources" : [],
             },
-        
-        print(f" processing the document")
-        query_embedding = self._get_query_embeddings(question)
-        
-        results = self.client.query_points(
-            collection_name=self.collection_name,
-            query=query_embedding,
-            limit=top_k,
-            with_payload=True,
-            with_vectors=False,
+        results = self.hybrid_search(
+            query=question,
+            top_k=top_k,
+            dense_limit=10,
+            sparse_limit=10,
+            dense_weight=0.5,
+            sparse_weight=0.5,
         ) 
-        
-        
-        if not results.points:
+        if not results:
             return {
                 "answer": "I couldn't find any relevant information in your documents.",
                 "sources": [],
-            }
-        
-        
-             
+            }  
         context_parts  = []
         source_info  = []
         
-        for i,point in enumerate(results.points,1):
-            
-            playload = point.payload or {}
-            
-            content = playload.get("content","")
+        for i,result in enumerate(results,1):
+
+            content = result["content"]
             
             content = " ".join(content.split())
             
@@ -220,9 +374,11 @@ class RAGService:
             
             source_info.append({
                 "source_index" : i,
-                "file_name" : playload.get("file_name","Unknown"),
-                "score"  :round(point.score,4),
-                "chunk_id":point.id, 
+                "file_name" : result["file_name"],
+                "rrf_score" : result["rrf_score"],
+                "dense_rank":result["dense_rank"],
+                "sparse_rank":result["sparse_rank"],
+                "chunk_id":result["id"],
                 "content_preview"  :content[:200] + "..." if len(content) > 200 else content,
             })
         context = "\n\n".join(context_parts)

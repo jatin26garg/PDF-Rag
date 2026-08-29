@@ -18,6 +18,7 @@ class Settings:
     CHROMA_COLLECTION_NAME: str = os.getenv("CHROMA_COLLECTION_NAME", "my_documents")
 
     DENSE_VECTOR_SIZE: int = 1024
+    SPARSE_VECTOR_SIZE:int = 250000  
     
     MAX_FILE_SIZE : int = int(os.getenv("MAX_FILE_SIZE", 10485760))
     ALLOWED_EXTENSIONS: List[str] = ['.pdf', '.docx', '.txt']
