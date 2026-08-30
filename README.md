@@ -13,7 +13,7 @@ This system allows you to build an intelligent document Q&A platform with just a
 - ** Perform Hybrid Search** — Semantic + keyword search simultaneously
 - ** Get Accurate Answers** — With automatic source citations and references
 - ** Run Locally** — No external dependencies except Gemini API (*WILL REPLACE IT WITH *QWEN-3-8B* SO IT RUNS COMPLETELY LOCALLY*)
-- ** Production-Ready** — Built with industry-standard tools
+- ** Production-Ready** — Built with industry-standard tools 
 
 ---
 
