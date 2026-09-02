@@ -10,8 +10,8 @@ rag = RAGService()
 
 app = FastAPI(
     title="Document RAG API",
-    description="upload que and ask que with rag",
-    version='1.0.0',
+    description="Upload documents and ask questions with RAG (Qwen3:8B + Qdrant)",
+    version='3.0.0',
 )
 
 app.add_middleware(
@@ -30,7 +30,8 @@ async def root():
         "vector_db": "Qdrant",
         "embedding_dimension": 1024,
         "service" : "Document RAG API",
-        "version" : "1.0.0"
+        "version" : "3.0.0",
+        "rag_tool": "rag-tool"
     }
 
 @app.post("/upload")
@@ -59,8 +60,9 @@ async def upload_document(file: UploadFile = File(...)):
         return{
             "status" : "success",
             "document_id" : doc_id,
-            "file_name" : file_name,
+            "filename" : file_name,
             "message" : f"Successfully proccessed {file_name}"
+            
         }
     except ValueError as e:
         raise HTTPException(400, detail=str(e))
@@ -77,14 +79,15 @@ async def ask_question(request: QueryRequest):
         result = rag.query(question =request.question, top_k = request.top_k)
         print(f"the result is {result}")
         return result
-    
+    except HTTPException:
+        raise
     except Exception as e:
         print(f" Query Error : {str(e)}")
         raise HTTPException(500, detail=f"internal error {str(e)}")
     
 @app.get("/documents", response_model=List[Documentinfo])
 async def list_documents():
-    return rag.get_documents
+    return rag.get_documents()
 
 @app.delete("/documents/{doc_id}")
 async def delete_document(doc_id:str):

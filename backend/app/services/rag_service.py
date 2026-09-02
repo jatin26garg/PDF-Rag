@@ -8,6 +8,10 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings,ChatGoogleGenera
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
+from langchain_ollama import ChatOllama
+from langchain_core.prompts import ChatMessagePromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
 from qdrant_client import QdrantClient,models
 from qdrant_client.http.exceptions import UnexpectedResponse
 
@@ -37,12 +41,14 @@ class RAGService:
             use_fp16=False,
             device="cpu"
         )
-        
-        self.llm = ChatGoogleGenerativeAI(
-            model= "gemini-2.5-flash",
-            google_api_key = settings.GEMINI_API_KEY,
+        print(f" connecting to ollama model")
+        self.llm = ChatOllama(
+            model= settings.CHAT_MODEL,
+            base_url= settings.OLLAMA_BASE_URL,
             temperature = 0.3,
+            disable_streaming=False,
         )
+        print(f" qwen model is connected")
         
         self.prompt = ChatPromptTemplate.from_template("""
             You are a helpful assistant that answers questions based on the provided context.
@@ -384,7 +390,8 @@ class RAGService:
         context = "\n\n".join(context_parts)
         
         print(f" generating answer --")
-        
+        print(f"   Generating answer with {settings.CHAT_MODEL}...")
+                
         chain = (
             {
                 "context"  : lambda x:x["context"],

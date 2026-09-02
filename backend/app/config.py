@@ -13,6 +13,9 @@ class Settings:
     QDRANT_PORT: int = int(os.getenv("QDRANT_PORT", 6333))
     QDRANT_COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION_NAME", "documents")
 
+    OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    CHAT_MODEL: str = os.getenv("CHAT_MODEL", "qwen3:8b")
+
     
     CHROMA_PERSIST_DIR:str = os.getenv("CHROMA_PERSIST_DIR","./chroma_db")
     CHROMA_COLLECTION_NAME: str = os.getenv("CHROMA_COLLECTION_NAME", "my_documents")
@@ -27,9 +30,6 @@ class Settings:
 
     def __init__(self):
 
-        if not self.GEMINI_API_KEY:
-            raise ValueError(
-                "Gemmini api key is missing !"
-            )
+        pass
 
 settings = Settings() 
