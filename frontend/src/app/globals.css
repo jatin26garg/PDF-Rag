@@ -1,0 +1,100 @@
+
+@tailwind utilities;
+
+:root {
+    --foreground-rgb: 0, 0, 0;
+    --background-rgb: 249, 250, 251;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --foreground-rgb: 255, 255, 255;
+        --background-rgb: 17, 24, 39;
+    }
+}
+
+body {
+    color: rgb(var(--foreground-rgb));
+    background: rgb(var(--background-rgb));
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+@media (prefers-color-scheme: dark) {
+    ::-webkit-scrollbar-thumb {
+        background: #374151;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #4b5563;
+    }
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Loading dots */
+.dot-typing {
+    position: relative;
+    left: -9999px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6b7280;
+    color: #6b7280;
+    box-shadow: 9984px 0 0 0 #6b7280, 9990px 0 0 0 #6b7280, 9996px 0 0 0 #6b7280;
+    animation: dot-typing 1.5s infinite linear;
+}
+
+@keyframes dot-typing {
+    0% {
+        box-shadow: 9984px 0 0 0 #6b7280, 9990px 0 0 0 #6b7280, 9996px 0 0 0 #6b7280;
+    }
+    16.667% {
+        box-shadow: 9984px -10px 0 0 #6b7280, 9990px 0 0 0 #6b7280, 9996px 0 0 0 #6b7280;
+    }
+    33.333% {
+        box-shadow: 9984px 0 0 0 #6b7280, 9990px 0 0 0 #6b7280, 9996px 0 0 0 #6b7280;
+    }
+    50% {
+        box-shadow: 9984px 0 0 0 #6b7280, 9990px -10px 0 0 #6b7280, 9996px 0 0 0 #6b7280;
+    }
+    66.667% {
+        box-shadow: 9984px 0 0 0 #6b7280, 9990px 0 0 0 #6b7280, 9996px 0 0 0 #6b7280;
+    }
+    83.333% {
+        box-shadow: 9984px 0 0 0 #6b7280, 9990px 0 0 0 #6b7280, 9996px -10px 0 0 #6b7280;
+    }
+    100% {
+        box-shadow: 9984px 0 0 0 #6b7280, 9990px 0 0 0 #6b7280, 9996px 0 0 0 #6b7280;
+    }
+}

@@ -30,6 +30,34 @@ export const ragService = {
                 throw new Error(`File size (${(file.size / 1024/1024).toFixed(1)}MB) exceds 10 MB limit`)
         }
         return await uploadDocument(file)
+    },
+
+    list : async () : Promise<Document[]> => {
+        return await getDocuments();
+    },
+
+    delete :async (documentId : string): Promise<void> =>{
+        await deleteDocument(documentId);
+    },
+
+    ask: async (question : string , top_k :number = 3) : Promise<QueryResponse>=>{
+        if(!question.trim){
+            throw new Error('Question cannot be empty');
+        }
+        return await queryRAG({question: question.trim(), top_k : top_k});
+    },
+
+    askStream : async(question:string, onChunk: (chunk : string)=>void,onComplete:()=>void, onError: (error: Error)=>void, top_k:number = 3)=>{
+        if(!question.trim()){
+            throw new Error('Question cannot be empty');
+            return;
+        }
+        await queryRAGStream(
+            {question: question.trim() , top_k : top_k},
+            onChunk,
+            onComplete,
+            onError,
+        );
     }
     
 }
