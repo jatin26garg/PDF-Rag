@@ -1,0 +1,135 @@
+# ===================================================
+# DOCKER COMPOSE - Complete RAG System
+# ===================================================
+
+version: '3.8'
+
+services:
+  # ========== 1. QDRANT - Vector Database ==========
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: rag-qdrant
+    ports:
+      - "6333:6333"      # REST API
+      - "6334:6334"      # gRPC API
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__SERVICE__HTTP_PORT=6333
+    restart: unless-stopped
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ========== 2. OLLAMA - LLM Server ==========
+  ollama:
+    image: ollama/ollama:latest
+    container_name: rag-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_ORIGINS=*
+    restart: unless-stopped
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ========== 3. RAG BACKEND - FastAPI Application ==========
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rag-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/qdrant_storage:/app/qdrant_storage
+      - bge_m3_cache:/root/.cache/huggingface
+    environment:
+      # Qdrant settings
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION_NAME=my_documents
+      
+      # Ollama settings
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - CHAT_MODEL=qwen3:8b
+      
+      # BGE-M3 settings
+      - EMBEDDING_MODEL=BAAI/bge-m3
+      
+      # File upload settings
+      - MAX_FILE_SIZE=10485760
+      - ALLOWED_EXTENSIONS=.pdf,.docx,.txt
+      
+      # CORS settings
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost:8000
+      
+      # Environment
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ========== 4. MODEL INITIALIZER (one-time setup) ==========
+  model-loader:
+    image: ollama/ollama:latest
+    container_name: rag-model-loader
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - rag-network
+    depends_on:
+      ollama:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo '📥 Downloading Qwen3:8B model...' &&
+        ollama pull qwen3:8b &&
+        echo '✅ Model loaded successfully!'
+      "
+    restart: "no"
+
+# ========== VOLUMES ==========
+volumes:
+  qdrant_storage:
+    name: rag_qdrant_data
+  ollama_models:
+    name: rag_ollama_models
+  bge_m3_cache:
+    name: rag_bge3_cache
+
+# ========== NETWORKS ==========
+networks:
+  rag-network:
+    name: rag_network
+    driver: bridge
