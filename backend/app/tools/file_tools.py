@@ -218,7 +218,89 @@ class FileSystemTools:
                 "error": str(e),
                 "path": str(path),
             }
-                        
+    def delete_file(self, path :Union[str, Path]) -> Dict[str, Any]:
+        
+        try:
+            resolved_path = self._resolve_path(path)
+            
+            if not resolved_path.exists():
+                raise ValueError(f"File not found {resolved_path}")
+            if resolved_path.is_dir():
+                raise ValueError(f"Cannot delete directory. Use delete_directory() if needed.")
+            
+            resolved_path.unlink()
+
+            self._log_operation("delete", resolved_path, True, {})
+
+            return {
+                "success": True,
+                "path": str(resolved_path),
+            }
+        except Exception as e:
+            self._log_operation("delete", path, False, {"error": str(e)})
+            
+            return {
+                "success": False,
+                "error": str(e),
+                "path": str(path),
+            }
+            
+    def get_file_info(self, path : Union[str, Path]) -> Dict[str, Any]:
+        
+        try:
+            resolved_path = self._resolve_path(path)
+            stat = resolved_path.stat() if resolved_path.exists() else None
+            
+            result = {
+                "success": True,
+                "path": str(resolved_path),
+                "exists": resolved_path.exists(),
+                "is_file": resolved_path.is_file() if resolved_path.exists() else False,
+                "is_dir": resolved_path.is_dir() if resolved_path.exists() else False,
+                "size": stat.st_size if resolved_path.exists() else 0,
+            }
+            if resolved_path.exists():
+                result["created"] = datetime.fromtimestamp(stat.st_ctime).isoformat()
+                result["modified"] = datetime.fromtimestamp(stat.st_mtime).isoformat()
+                result["accessed"] = datetime.fromtimestamp(stat.st_atime).isoformat()
+            return result
+        
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "path": str(path),
+            }
+            
+    def get_workspace_info(self) -> Dict[str, Any]:
+        
+        total_files = 0
+        total_size = 0
+        
+        for root, dirs, files in os.walk(self.workspace):
+            for file in files:
+                file_path = Path(root) / file
+                total_files += 1
+                total_size += file_path.stat().st_size
+        
+        return {
+            "success": True,
+            "workspace": str(self.workspace),
+            "total_files": total_files,
+            "total_size_mb": total_size / (1024 * 1024),
+            "directories": {
+                "inputs": str(self.inputs_dir),
+                "outputs": str(self.outputs_dir),
+                "temp": str(self.temp_dir),
+            }
+        }
+    
+    
+def create_file_tool() -> FileSystemTools:
+        
+    return FileSystemTools()
+
+        
 
             
 
