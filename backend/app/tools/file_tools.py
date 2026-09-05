@@ -9,7 +9,7 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-class FileSystemTools:
+class FileSystemTool:
     def __init__(self):
         
         self.workspace  =settings.WORKSPACE_DIR
@@ -143,7 +143,7 @@ class FileSystemTools:
             
             resolved_path.write_text(content, encoding=encoding)
 
-            self._log_operation("write", resolved_path, True, {
+            self._log_opertion("write", resolved_path, True, {
                 "size": content_size,
                 "encoding": encoding,
                 "overwrite": overwrite,
@@ -155,7 +155,7 @@ class FileSystemTools:
                 "encoding": encoding,
             }
         except Exception as e:
-            self._log_operation("write", path, False, {"error": str(e)})
+            self._log_opertion("write", path, False, {"error": str(e)})
             return {
                 "success": False,
                 "error": str(e),
@@ -188,16 +188,17 @@ class FileSystemTools:
                             continue
                         files.append(str(file_path))
             else:
+                workspace_resolved = self.workspace.resolve()
                 
                 for item in resolved_path.iterdir():
-                    rel_path = item.relative_to(self.workspace)
+                    rel_path = item.relative_to(workspace_resolved)
                     if item.is_file():
                         if pattern and not item.match(pattern):
                             continue
                         files.append(str(rel_path))
                     elif item.is_dir():
                         directories.append(str(rel_path))
-            self._log_operation("list", resolved_path, True, {
+            self._log_opertion("list", resolved_path, True, {
                 "files_count": len(files),
                 "directories_count": len(directories),
                 "recursive": recursive,
@@ -211,7 +212,7 @@ class FileSystemTools:
                 "count": len(files) + len(directories),
             }
         except Exception as e:
-            self._log_operation("list", path, False, {"error": str(e)})
+            self._log_opertion("list", path, False, {"error": str(e)})
             
             return {
                 "success": False,
@@ -230,14 +231,14 @@ class FileSystemTools:
             
             resolved_path.unlink()
 
-            self._log_operation("delete", resolved_path, True, {})
+            self._log_opertion("delete", resolved_path, True, {})
 
             return {
                 "success": True,
                 "path": str(resolved_path),
             }
         except Exception as e:
-            self._log_operation("delete", path, False, {"error": str(e)})
+            self._log_opertion("delete", path, False, {"error": str(e)})
             
             return {
                 "success": False,
@@ -296,9 +297,9 @@ class FileSystemTools:
         }
     
     
-def create_file_tool() -> FileSystemTools:
+def create_file_tool() -> FileSystemTool:
         
-    return FileSystemTools()
+    return FileSystemTool()
 
         
 

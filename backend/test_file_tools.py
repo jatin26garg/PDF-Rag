@@ -64,6 +64,7 @@ def test_file_tools():
     print("-"*40)
     
     result = tool.list_files("outputs")
+    
     print(f"   Success: {result['success']}")
     if result['success']:
         print(f"   Files: {result['files']}")
