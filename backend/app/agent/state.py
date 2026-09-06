@@ -10,7 +10,6 @@ class AgentState(TypedDict, total = False):
     max_steps : int
     
     rag_results: List[Dict[str, Any]]
-    code_output : str
     file_path : str
     final_answer : str
     
