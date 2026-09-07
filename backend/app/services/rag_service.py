@@ -408,6 +408,7 @@ class RAGService:
         })
         
         return {
+            "success" : True,
             "answer" : answer,
             "sources" : source_info,
         }
