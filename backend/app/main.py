@@ -1,10 +1,12 @@
 from fastapi import FastAPI, UploadFile,File,HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List
+from typing import List, Dict, Optional
 
 from app.config import settings
 from app.models import QueryRequest,QueryResponse,Documentinfo
 from app.services.rag_service import RAGService
+from app.agent.orchestrator import run_agent
+from pydantic import BaseModel
 
 rag = RAGService()
 
@@ -33,6 +35,37 @@ async def root():
         "version" : "3.0.0",
         "rag_tool": "rag-tool"
     }
+class AgentExecuteRequest(BaseModel):
+    task: str
+    file_path: Optional[str] = None
+    max_steps: Optional[int] = 6
+
+@app.post("/agent/execute")
+async def execute_agent(request: AgentExecuteRequest):
+    if not request.task or not request.task.strip():
+        raise HTTPException(400, detail="task is required")
+    
+    try:
+        result = run_agent(
+            task=request.task,
+            file_path=request.file_path,
+            max_steps=request.max_steps or 6
+        )
+
+        # Return the most useful fields for the frontend
+        return {
+            "status": "success",
+            "final_answer": result.get("final_answer", ""),
+            "file_path": result.get("file_path"),
+            "tool_calls": result.get("tool_calls", []),
+            "rag_results": result.get("rag_results", []),
+            "errors": result.get("errors", []),
+            "memory": result.get("memory", []),
+            "plan": result.get("plan", []),
+        }
+    except Exception as e:
+        raise HTTPException(500, detail=f"Agent execution failed: {str(e)}")
+
 
 @app.post("/upload")
 async def upload_document(file: UploadFile = File(...)):

@@ -14,18 +14,19 @@ from typing import Dict, Any
 
 from app.services.rag_service import RAGService
 from app.tools.file_tools import create_file_tool
+from app.tools.rag_tool import RAGTool
 
 # Both RAGService (loads BGE-M3 + connects to Qdrant/Ollama) and
 # FileSystemTool are expensive/stateful - build once per process and
 # reuse across every graph run instead of re-instantiating per request.
 
-_rag_tool = RAGService()
+_rag_tool = RAGTool()
 _file_tool = create_file_tool()
 
 
 def rag_search(query: str, top_k: int = 3) -> Dict[str, Any]:
     """Retrieve context from indexed PDFs and get a generated answer."""
-    return _rag_tool.query(question=query, top_k=top_k)
+    return _rag_tool.search(query=query, top_k=top_k)
 
 
 def write_output(path: str, content: str) -> Dict[str, Any]:

@@ -353,7 +353,7 @@ class RAGService:
             return{
                 "answer"  : ("no documents have been been uploaded .. please upload the document first"),
                 "sources" : [],
-            },
+            }
         results = self.hybrid_search(
             query=question,
             top_k=top_k,

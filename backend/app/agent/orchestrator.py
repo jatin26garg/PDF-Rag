@@ -2,13 +2,13 @@ from typing import Optional
 
 from langgraph.graph import StateGraph,END
 from app.agent.state import AgentState
-from app.agent.nodes import (_intit_node,plan_node,execute_step_node,should_continue,finalize_node)
+from app.agent.nodes import (_init_node,plan_node,execute_step_node,should_continue,finalize_node)
 
 
 def build_agent():
     graph = StateGraph(AgentState)
     
-    graph.add_node("init",_intit_node)
+    graph.add_node("init",_init_node)
     graph.add_node("plan", plan_node)
     graph.add_node("execute_step",execute_step_node)
     graph.add_node("finalize", finalize_node)

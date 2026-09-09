@@ -27,7 +27,7 @@ def _clean_json(raw: str) -> str:
     match = re.search(r"(\{.*\}|\[.*\])", raw, flags=re.DOTALL)
     return match.group(1) if match else raw
 
-def _intit_node(state : AgentState) ->AgentState:
+def _init_node(state : AgentState) ->AgentState:
     state.setdefault("plan" ,[])
     state.setdefault("current_step",0)
     state.setdefault("max_steps",6)
@@ -38,6 +38,8 @@ def _intit_node(state : AgentState) ->AgentState:
     state.setdefault("iteration",0)
     state.setdefault("tool_calls", [])
     state["start_time"] = datetime.now().isoformat()
+    
+    return state
     
 def plan_node(state: AgentState)->AgentState:
     """
