@@ -71,6 +71,16 @@ def _extract_plan_list(parsed):
             return str_values
     return None
 
+_FILENAME_PATTERN = re.compile(
+    r'(?:to|as|into|save\s+to|write\s+to|save\s+it\s+to|write\s+it\s+to)\s+'
+    r'([\w\-\.]+\.(?:md|txt|json|csv|docx|xlsx))',
+    re.IGNORECASE
+)
+
+def _extract_filename(text: str) -> str | None:
+    """Extract filename from text like 'save it to report.md'."""
+    match = _FILENAME_PATTERN.search(text)
+    return match.group(1) if match else None
 def plan_node(state: AgentState)->AgentState:
     """
     Ask the LLM to break the task into a short ordered list of concrete
@@ -111,6 +121,10 @@ def plan_node(state: AgentState)->AgentState:
         
     state['plan'] = plan
     state['memory'].append({"node" : "plan" , "plan" : plan, "raw_llm_response": raw_content})
+    if not state.get("file_path"):
+        filename = _extract_filename(state["task"])
+        if filename:
+            state["file_path"] = f"outputs/{filename}"
     return state
  
 _WRITE_KEYWORDS = ("save", "write", "export", "store", "persist")
@@ -133,12 +147,15 @@ def execute_step_node(state:AgentState)->AgentState:
         content = state["final_answer"] or "\n\n".join(
             r.get("answer", "") for r in state["rag_results"] if r.get("answer")
         )
-        path = state.get("file_path") or "outputs/agent_answer.md"
+        
+        path = state["file_path"]  or "outputs/agent_answer.md" 
         result = write_output(path=path, content=content)
         state["tool_calls"].append(f"write_output({path})")
         
         if not result.get("success"):
             state["errors"].append(result.get("error", "write_output failed"))
+        else:
+            state["file_path"] = result["path"]
     else:
         result = rag_search(query=state["task"])
         state["tool_calls"].append(f"rag_search({state['task'][:60]!r})")
