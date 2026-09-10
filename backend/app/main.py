@@ -4,11 +4,11 @@ from typing import List, Dict, Optional
 
 from app.config import settings
 from app.models import QueryRequest,QueryResponse,Documentinfo
-from app.services.rag_service import RAGService
+from app.services.rag_service import get_rag_service
 from app.agent.orchestrator import run_agent
 from pydantic import BaseModel
 
-rag = RAGService()
+rag = get_rag_service()
 
 app = FastAPI(
     title="Document RAG API",
@@ -134,5 +134,7 @@ async def delete_document(doc_id:str):
         }
     except Exception as e:
         print(f" couldnt delete")
+        
         raise HTTPException(500, detail=f" internal error : {str(e)}")
+    
     

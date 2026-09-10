@@ -1,12 +1,12 @@
 
 
 from typing import Dict, Any, List, Optional
-from app.services.rag_service import RAGService
+from app.services.rag_service import get_rag_service
 
 class RAGTool:
     
     def __init__(self):
-        self.rag_service = RAGService()
+        self.rag_service = get_rag_service()
     
     def search(self, query:str, top_k:int = 3)->Dict[str, Any]:
         

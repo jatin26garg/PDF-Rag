@@ -40,7 +40,37 @@ def _init_node(state : AgentState) ->AgentState:
     state["start_time"] = datetime.now().isoformat()
     
     return state
-    
+
+def _extract_plan_list(parsed):
+    """
+    Ollama's format="json" guarantees valid JSON, but NOT that the top-level
+    shape is a bare array - instruct-tuned models often wrap a requested
+    array in an object anyway, e.g. {"steps": [...]} or {"plan": [...]}.
+    Accept the bare-array case (what we asked for) and the common
+    dict-wrapped cases, so a well-formed answer never gets thrown away
+    just because of the wrapper.
+    """
+    if isinstance(parsed, list):
+        return parsed
+    if isinstance(parsed, dict):
+        for key in ("steps", "plan", "actions", "tasks"):
+            if isinstance(parsed.get(key), list):
+                return parsed[key]
+        # last resort 1: a dict with exactly one list-valued key
+        list_values = [v for v in parsed.values() if isinstance(v, list)]
+        if len(list_values) == 1:
+            return list_values[0]
+        # last resort 2: qwen3 sometimes turns "give me a list" into an
+        # object whose keys AND values are both the step text itself
+        # (e.g. {"Search the PDFs": "Search the PDFs", "Save it": "Save it"})
+        # to satisfy an object-only JSON mode while still trying to comply.
+        # If every value is a plain non-empty string, treat the values as
+        # the ordered step list rather than throwing a good plan away.
+        str_values = [v for v in parsed.values() if isinstance(v, str) and v.strip()]
+        if parsed and len(str_values) == len(parsed):
+            return str_values
+    return None
+
 def plan_node(state: AgentState)->AgentState:
     """
     Ask the LLM to break the task into a short ordered list of concrete
@@ -56,29 +86,33 @@ def plan_node(state: AgentState)->AgentState:
         "  - write_output: saves text to a file\n\n"
         "Only include a write_output step if the user explicitly asked to "
         "save, export, or write the result to a file.\n"
-        "Respond with ONLY a JSON array of short step strings, nothing else. "
-        'Example: ["Search the PDFs for the refund policy", '
-        '"Save the answer to refund_policy.md"]'
+        'Respond with ONLY a JSON object of the form {"steps": [...]}, '
+        "where the value is a list of short step strings, nothing else. "
+        'Example: {"steps": ["Search the PDFs for the refund policy", '
+        '"Save the answer to refund_policy.md"]}'
     )
     
+    raw_content = None
     try:
         resp = _llm.invoke([
             {"role" : "system",  "content" : system},
             {"role" : "user" , "content" : state["task"]}
         ])
-        
-        plan = json.loads(_clean_json(resp.content))
-        
-        if not isinstance(plan,list) or not plan:
-            raise ValueError("planner returned an empty or malformed plan")
+        raw_content = resp.content
+ 
+        parsed = json.loads(_clean_json(raw_content))
+        plan = _extract_plan_list(parsed)
+ 
+        if not plan:
+            raise ValueError(f"planner returned an empty or malformed plan (raw: {raw_content!r})")
     except Exception as e:
         plan = ["search the pdfs to answer the task"]
         state['errors'].append(f"plan_node fallback used : {e}")
         
     state['plan'] = plan
-    state['memory'].append({"node" : "plan" , "plan" : plan})
+    state['memory'].append({"node" : "plan" , "plan" : plan, "raw_llm_response": raw_content})
     return state
-
+ 
 _WRITE_KEYWORDS = ("save", "write", "export", "store", "persist")
 
 def execute_step_node(state:AgentState)->AgentState:

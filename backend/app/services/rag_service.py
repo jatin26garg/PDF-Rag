@@ -1,6 +1,6 @@
 import os
 import uuid
-from typing import List, Dict,Any , Tuple
+from typing import List, Dict,Any , Tuple, Optional
 from datetime import datetime
 import chromadb
 from chromadb.config import Settings as ChromaSettings
@@ -460,10 +460,10 @@ class RAGService:
         
         return True
     
-            
+_rag_service_instance: Optional["RAGService"] = None
         
-        
-        
-        
-        
-        
+def get_rag_service() -> "RAGService":
+    global _rag_service_instance
+    if _rag_service_instance is None:
+        _rag_service_instance = RAGService()
+    return _rag_service_instance
