@@ -7,6 +7,7 @@ from app.models import QueryRequest,QueryResponse,Documentinfo
 from app.services.rag_service import get_rag_service
 from app.agent.orchestrator import run_agent
 from pydantic import BaseModel
+from pathlib import Path
 
 rag = get_rag_service()
 
@@ -18,7 +19,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:8000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -88,6 +93,11 @@ async def upload_document(file: UploadFile = File(...)):
         if file_size == 0:
             raise HTTPException(400,"file is empty")
         
+        inputs_dir = settings.WORKSPACE_DIR / "inputs"
+        inputs_dir.mkdir(parents=True, exist_ok=True)
+        saved_path = inputs_dir / file_name
+        saved_path.write_bytes(content)
+        print(f"📁 Saved upload to: {saved_path}")
         doc_id = rag.process_document(content,file_name)
         
         return{
@@ -120,7 +130,19 @@ async def ask_question(request: QueryRequest):
     
 @app.get("/documents", response_model=List[Documentinfo])
 async def list_documents():
-    return rag.get_documents()
+    documents =  rag.get_documents()
+    
+    output_dir = Path("workspace/outputs")
+
+    for file in output_dir.iterdir():
+        if file.is_file():
+            documents.append({
+                "file_name": file.name,
+                "file_path": str(file),
+                "type": "agent_output"
+            })
+
+    return documents
 
 @app.delete("/documents/{doc_id}")
 async def delete_document(doc_id:str):

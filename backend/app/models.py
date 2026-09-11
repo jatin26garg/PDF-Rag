@@ -20,10 +20,12 @@ class QueryResponse(BaseModel):
     timestamp:datetime = datetime.now()
 
 class Documentinfo(BaseModel):
-    id: str
-    file_name:str
-    chunk_count:int
-    uploaded_at:str
+    id: Optional[str] = None
+    file_name: str
+    chunk_count: Optional[int] = None
+    uploaded_at: Optional[str] = None
+    file_path: Optional[str] = None
+    type: Optional[str] = None
 
 class DocumentChunk(BaseModel):
     id:str
