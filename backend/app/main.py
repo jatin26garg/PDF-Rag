@@ -127,7 +127,9 @@ async def ask_question(request: QueryRequest):
     except Exception as e:
         print(f" Query Error : {str(e)}")
         raise HTTPException(500, detail=f"internal error {str(e)}")
-    
+
+
+
 @app.get("/documents", response_model=List[Documentinfo])
 async def list_documents():
     documents =  rag.get_documents()

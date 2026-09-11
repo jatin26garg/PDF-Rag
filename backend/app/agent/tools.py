@@ -24,7 +24,7 @@ _rag_tool = RAGTool()
 _file_tool = create_file_tool()
 
 
-def rag_search(query: str, top_k: int = 3) -> Dict[str, Any]:
+def rag_search(query: str, top_k: int = 6) -> Dict[str, Any]:
     """Retrieve context from indexed PDFs and get a generated answer."""
     return _rag_tool.search(query=query, top_k=top_k)
 

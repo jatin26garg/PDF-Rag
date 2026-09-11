@@ -1,7 +1,4 @@
-**skills_summary.md**  
-**Technical Skills**  
-- **Programming Languages**: React, Next.js, Node.js, Python  
-- **Frameworks & Tools**: LLM frameworks, vector databases, real-time systems (WebSockets/WebRTC)  
-- **Problem-Solving**: Strong foundation with 500+ problems solved on LeetCode  
+The technical skills mentioned for Jatin Garg include Full-Stack Development and Agentic-AI Development. These are cited from his professional profile details across the provided sources.  
 
-*Sources: [Source1], [Source2]*
+**Answer saved to `temp_file.md`.**  
+*Sources: [Source1], [Source2], [Source3]*

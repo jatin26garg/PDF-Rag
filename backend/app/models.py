@@ -5,7 +5,7 @@ from datetime import datetime
 
 class QueryRequest(BaseModel):
     question : str
-    top_k :int = 3
+    top_k :int = 6
     
 class SourceInfo(BaseModel):
     source_index:int

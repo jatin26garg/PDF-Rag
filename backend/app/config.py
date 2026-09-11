@@ -24,6 +24,13 @@ class Settings:
 
     DENSE_VECTOR_SIZE: int = 1024
     SPARSE_VECTOR_SIZE:int = 250000  
+
+    # Safety cap (in characters) when a query needs the FULL document
+    # (e.g. "list every question in this document") instead of a top-k
+    # chunk slice. Keeps huge documents from blowing the LLM's context
+    # window while letting small/medium docs (like a 5-page exam paper)
+    # through in their entirety.
+    MAX_FULL_DOC_CONTEXT_CHARS: int = int(os.getenv("MAX_FULL_DOC_CONTEXT_CHARS", 20000))
     
     MAX_FILE_SIZE : int = int(os.getenv("MAX_FILE_SIZE", 10485760))
     ALLOWED_EXTENSIONS: List[str] = ['.pdf', '.docx', '.txt']
